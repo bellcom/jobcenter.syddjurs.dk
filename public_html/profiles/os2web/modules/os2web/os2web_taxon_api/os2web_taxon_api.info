@@ -1,0 +1,37 @@
+; Module name (human readable)
+name = OS2Web Taxon API Module
+; Module description
+description = Implements calls to taxon
+
+package = OS2Web - Kerne
+core = 7.x
+
+;Added by OS2Web 2013-03-25
+project=OS2Web
+version=1.11.17
+timestamp=1364213835
+
+
+;Added by OS2Web 2013-03-25
+project=OS2Web
+version=1.11.18
+timestamp=1364215842
+
+
+;Added by OS2Web 2013-03-25
+project=OS2Web
+version=1.11.19
+timestamp=1364217284
+
+
+;Added by OS2Web 2013-04-15
+project=OS2Web
+version=1.11.21
+timestamp=1366016369
+
+
+;Added by OS2Web 2013-04-19
+project=OS2Web
+version=1.12
+timestamp=1366374241
+

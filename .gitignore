@@ -1,0 +1,8 @@
+logs
+sessions
+tmp
+site
+
+*.sql.gz
+os2web-deploy
+apache-nutch-1.6

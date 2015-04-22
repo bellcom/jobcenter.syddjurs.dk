@@ -97,3 +97,14 @@ function os2web_jobcenter_syddjurs_settings_form(){
 
   return system_settings_form($form);
 }
+
+/**
+ * Implements hook_process_block().
+ */
+function os2web_jobcenter_syddjurs_process_block(&$vars) {
+  // If this is the facetapi block. Add current_path, as a link destination
+  // to the title.
+  if ($vars['block']->module == 'facetapi') {
+    $vars['block']->subject = l($vars['block']->subject, current_path());
+  }
+}

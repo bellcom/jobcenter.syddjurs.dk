@@ -146,3 +146,11 @@ body {background-image: url("../images/bg.png")}
 .fb-like {
     display: none;
 }
+
+#region-sidebar-first #facetapi-facet-apachesolrsolr-block-im-field-site-structure {
+  margin: 0;
+}
+
+#region-sidebar-first .block-facetapi h2 a {
+  color: #333;
+}

@@ -17,7 +17,8 @@ Drupal.tableSelect = function () {
   var table = this, checkboxes, lastChecked;
   var strings = { 'selectAll': Drupal.t('Select all rows in this table'), 'selectNone': Drupal.t('Deselect all rows in this table') };
   var updateSelectAll = function (state) {
-    $('th.select-all input:checkbox', table).each(function () {
+    // Update table's select-all checkbox (and sticky header's if available).
+    $(table).prev('table.sticky-header').andSelf().find('th.select-all input:checkbox').each(function() {
       $(this).attr('title', state ? strings.selectNone : strings.selectAll);
       this.checked = state;
     });
@@ -56,10 +57,14 @@ Drupal.tableSelect = function () {
     // Keep track of the last checked checkbox.
     lastChecked = e.target;
   });
+
+  // If all checkboxes are checked on page load, make sure the select-all one
+  // is checked too, otherwise keep unchecked.
+  updateSelectAll((checkboxes.length == $(checkboxes).filter(':checked').length));
 };
 
 Drupal.tableSelectRange = function (from, to, state) {
-  // We determine the looping mode based on the the order of from and to.
+  // We determine the looping mode based on the order of from and to.
   var mode = from.rowIndex > to.rowIndex ? 'previousSibling' : 'nextSibling';
 
   // Traverse through the sibling nodes.

@@ -97,7 +97,7 @@ jQuery.fn.fieldUIPopulateOptions = function (options, selected) {
       html += '<option value="' + value + '"' + (is_selected ? ' selected="selected"' : '') + '>' + text + '</option>';
     });
 
-    $(this).html(html).attr('disabled', disabled ? 'disabled' : '');
+    $(this).html(html).attr('disabled', disabled ? 'disabled' : false);
   });
 };
 
@@ -168,7 +168,7 @@ Drupal.fieldUIOverview = {
     var dragObject = this;
     var row = dragObject.rowObject.element;
     var rowHandler = $(row).data('fieldUIRowHandler');
-    if (rowHandler !== undefined) {
+    if (typeof rowHandler !== 'undefined') {
       var regionRow = $(row).prevAll('tr.region-message').get(0);
       var region = regionRow.className.replace(/([^ ]+[ ]+)*region-([^ ]+)-message([ ]+[^ ]+)*/, '$2');
 
@@ -319,7 +319,7 @@ Drupal.fieldUIDisplayOverview.field.prototype = {
         if (currentValue == 'hidden') {
           // Restore the formatter back to the default formatter. Pseudo-fields do
           // not have default formatters, we just return to 'visible' for those.
-          var value = (this.defaultFormatter != undefined) ? this.defaultFormatter : 'visible';
+          var value = (typeof this.defaultFormatter !== 'undefined') ? this.defaultFormatter : this.$formatSelect.find('option').val();
         }
         break;
 

@@ -25,6 +25,8 @@ function theme_test_theme($existing, $type, $theme, $path) {
  */
 function theme_test_system_theme_info() {
   $themes['test_theme'] = drupal_get_path('module', 'theme_test') . '/themes/test_theme/test_theme.info';
+  $themes['test_basetheme'] = drupal_get_path('module', 'theme_test') . '/themes/test_basetheme/test_basetheme.info';
+  $themes['test_subtheme'] = drupal_get_path('module', 'theme_test') . '/themes/test_subtheme/test_subtheme.info';
   return $themes;
 }
 
@@ -48,6 +50,11 @@ function theme_test_menu() {
   );
   $items['theme-test/hook-init'] = array(
     'page callback' => 'theme_test_hook_init_page_callback',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+  );
+  $items['theme-test/drupal-add-region-content'] = array(
+    'page callback' => '_theme_test_drupal_add_region_content',
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
@@ -122,6 +129,14 @@ function _theme_test_alter() {
  */
 function _theme_test_suggestion() {
   return theme(array('theme_test__suggestion', 'theme_test'), array());
+}
+
+/**
+ * Page callback, calls drupal_add_region_content.
+ */
+function _theme_test_drupal_add_region_content() {
+  drupal_add_region_content('content', 'World');
+  return 'Hello';
 }
 
 /**

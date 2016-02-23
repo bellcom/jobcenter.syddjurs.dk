@@ -15,12 +15,18 @@ function os2web_kontaktblok_get_block() {
   $result = 0;
   $menu = menu_get_active_trail();
   while ($item = array_pop($menu)) {
-    if (arg(0) == 'taxonomy' && arg(1) == 'term') {
-      $ent = taxonomy_term_load(arg(2));
-      $field = field_get_items('taxonomy_term', $ent, 'field_node_reference_kontaktblok');
+    $path = explode('/', $item['link_path']);
+    if ((isset($path[1]) && $path[1] == 'add') || (isset($path[2]) && $path[2] == 'edit')) {
+      continue;
     }
-    elseif (arg(0) == 'node' && is_numeric(arg(1))) {
-      $ent = node_load(arg(1));
+    if ($path[0] === 'taxonomy' && $path[1] == 'term') {
+      $ent = taxonomy_term_load($path[2]);
+      if ($ent) {
+        $field = field_get_items('taxonomy_term', $ent, 'field_node_reference_kontaktblok');
+      }
+    }
+    elseif ($path[0] == 'node' && is_numeric($path[1])) {
+      $ent = node_load($path[1]);
       $field = field_get_items('node', $ent, 'field_node_reference_kontaktblok');
     }
     else {
@@ -31,7 +37,6 @@ function os2web_kontaktblok_get_block() {
       break;
     }
   }
-error_log($result);
   if ($result == 0) {
     // Try to find current nodes contact. These are for them who are not in menu.
     $node = menu_get_object();
@@ -40,5 +45,7 @@ error_log($result);
       $result = $field[0]['nid'];
     }
   }
+
+
   return $result;
 }

@@ -11,9 +11,9 @@ files[] = ldap_profile.admin.inc
 files[] = LdapProfileConf.class.php
 files[] = LdapProfileConfAdmin.class.php
 
-; Information added by drupal.org packaging script on 2012-05-14
-version = "7.x-1.0-beta10"
+; Information added by Drupal.org packaging script on 2016-08-10
+version = "7.x-1.0-beta14"
 core = "7.x"
 project = "ldap"
-datestamp = "1337025356"
+datestamp = "1470868167"
 

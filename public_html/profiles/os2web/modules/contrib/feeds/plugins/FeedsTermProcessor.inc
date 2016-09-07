@@ -22,6 +22,7 @@ class FeedsTermProcessor extends FeedsProcessor {
   protected function entityInfo() {
     $info = parent::entityInfo();
     $info['label plural'] = t('Terms');
+    $info['bundle name'] = t('Vocabulary');
     return $info;
   }
 
@@ -30,33 +31,54 @@ class FeedsTermProcessor extends FeedsProcessor {
    */
   protected function newEntity(FeedsSource $source) {
     $vocabulary = $this->vocabulary();
-    $term = new stdClass();
+    $term = parent::newEntity($source);
     $term->vid = $vocabulary->vid;
     $term->vocabulary_machine_name = $vocabulary->machine_name;
-    $term->format = isset($source->importer->processor->config['input_format']) ? $source->importer->processor->config['input_format'] : 'plain_text';
+
     return $term;
   }
 
   /**
-   * Loads an existing term.
+   * Load an existing entity.
    */
-  protected function entityLoad(FeedsSource $source, $tid) {
-    return taxonomy_term_load($tid);
+  protected function entityLoad(FeedsSource $source, $entity_id) {
+    $entity = parent::entityLoad($source, $entity_id);
+
+    // Avoid missing bundle errors when term has been loaded directly from db.
+    if (empty($entity->vocabulary_machine_name) && !empty($entity->vid)) {
+      $vocabulary = taxonomy_vocabulary_load($entity->vid);
+      $entity->vocabulary_machine_name = ($vocabulary) ? $vocabulary->machine_name : NULL;
+    }
+
+    return $entity;
   }
 
   /**
    * Validates a term.
    */
   protected function entityValidate($term) {
-    if (empty($term->name)) {
+    parent::entityValidate($term);
+
+    if (drupal_strlen($term->name) == 0) {
       throw new FeedsValidationException(t('Term name missing.'));
     }
   }
 
   /**
    * Saves a term.
+   *
+   * We de-array parent fields with only one item.
+   * This stops leftandright module from freaking out.
    */
   protected function entitySave($term) {
+    if (isset($term->parent)) {
+      if (is_array($term->parent) && count($term->parent) == 1) {
+        $term->parent = reset($term->parent);
+      }
+      if (isset($term->tid) && ($term->parent == $term->tid || (is_array($term->parent) && in_array($term->tid, $term->parent)))) {
+        throw new FeedsValidationException(t("A term can't be its own child. GUID:@guid", array('@guid' => $term->feeds_item->guid)));
+      }
+    }
     taxonomy_term_save($term);
   }
 
@@ -79,265 +101,52 @@ class FeedsTermProcessor extends FeedsProcessor {
   }
 
   /**
-   * Override parent::configForm().
-   */
-  public function configForm(&$form_state) {
-    $options = array(0 => t('Select a vocabulary'));
-    foreach (taxonomy_get_vocabularies() as $vocab) {
-      $options[$vocab->machine_name] = check_plain($vocab->name);
-    }
-    $form = parent::configForm($form_state);
-    $form['vocabulary'] = array(
-      '#type' => 'select',
-      '#title' => t('Import to vocabulary'),
-      '#description' => t('Choose the vocabulary to import into. <strong>CAUTION:</strong> when deleting terms through the "Delete items" tab, Feeds will delete <em>all</em> terms from this vocabulary.'),
-      '#options' => $options,
-      '#default_value' => $this->config['vocabulary'],
-    );
-    return $form;
-  }
-
-  /**
-   * Override parent::configFormValidate().
-   */
-  public function configFormValidate(&$values) {
-    if (empty($values['vocabulary'])) {
-      form_set_error('vocabulary', t('Choose a vocabulary'));
-    }
-  }
-
-
-  /**
-   * Override the process function to ensure that we update a term, even if it
-   * doesn't look like it needs updating.
-   */
-  public function process(FeedsSource $source, FeedsParserResult $parser_result) {
-
-    $state = $source->state(FEEDS_PROCESS);
-
-    $this->orderHierarchicalTaxonomies($source, $parser_result->items);
-
-    while ($item = $parser_result->shiftItem()) {
-
-      if (!($entity_id = $this->existingEntityId($source, $parser_result)) ||
-           ($this->config['update_existing'] != FEEDS_SKIP_EXISTING)) {
-        try {
-          // Assemble node, map item to it, save.
-          $hash = $this->hash($item);
-          if (empty($entity_id)) {
-            $entity = $this->newEntity($source);
-            $this->newItemInfo($entity, $source->feed_nid, $hash);
-          }
-          else {
-            $entity = $this->entityLoad($source, $entity_id);
-            // The feeds_item table is always updated with the info for the most recently processed entity.
-            // The only carryover is the entity_id.
-            $this->newItemInfo($entity, $source->feed_nid, $hash);
-            $entity->feeds_item->entity_id = $entity_id;
-          }
-          $this->map($source, $parser_result, $entity);
-          $this->entityValidate($entity);
-          $this->entitySave($entity);
-
-          // Track progress.
-          if (empty($entity_id)) {
-            $state->created++;
-          }
-          else {
-            $state->updated++;
-          }
-        }
-        catch (Exception $e) {
-          $state->failed++;
-          drupal_set_message($e->getMessage(), 'warning');
-          $message = $e->getMessage();
-          $message .= '<h3>Original item</h3>';
-          $message .= '<pre>' . var_export($item, TRUE) . '</pre>';
-          $message .= '<h3>Entity</h3>';
-          $message .= '<pre>' . var_export($entity, TRUE) . '</pre>';
-          $source->log('import', $message, array(), WATCHDOG_ERROR);
-        }
-      }
-    }
-
-    // Set messages if we're done.
-    if ($source->progressImporting() != FEEDS_BATCH_COMPLETE) {
-      return;
-    }
-    $info = $this->entityInfo();
-    $tokens = array(
-      '@entity' => strtolower($info['label']),
-      '@entities' => strtolower($info['label plural']),
-    );
-    $messages = array();
-    if ($state->created) {
-      $messages[] = array(
-       'message' => format_plural(
-          $state->created,
-          'Created @number @entity.',
-          'Created @number @entities.',
-          array('@number' => $state->created) + $tokens
-        ),
-      );
-    }
-    if ($state->updated) {
-      $messages[] = array(
-       'message' => format_plural(
-          $state->updated,
-          'Updated @number @entity.',
-          'Updated @number @entities.',
-          array('@number' => $state->updated) + $tokens
-        ),
-      );
-    }
-    if ($state->failed) {
-      $messages[] = array(
-       'message' => format_plural(
-          $state->failed,
-          'Failed importing @number @entity.',
-          'Failed importing @number @entities.',
-          array('@number' => $state->failed) + $tokens
-        ),
-        'level' => WATCHDOG_ERROR,
-      );
-    }
-    if (empty($messages)) {
-      $messages[] = array(
-        'message' => t('There are no new @entities.', array('@entities' => strtolower($info['label plural']))),
-      );
-    }
-    foreach ($messages as $message) {
-      drupal_set_message($message['message']);
-      $source->log('import', $message['message'], array(), isset($message['level']) ? $message['level'] : WATCHDOG_INFO);
-    }
-  }
-
-  /**
-   * goal is to get taxonomy terms in correct order for importing such
-   * that parent terms are created first, then child terms
+   * Overrides parent::setTargetElement().
    *
-   * this function sorts by level with all top level (level = 0) first,
-   * then level2, level3, etc.
-   *
-   * @param $source is feed source config
-   * @param &$items is feed parser items array
-   *
-   * @returns $items sorted by level
+   * Operate on a target item that is a taxonomy term.
    */
-  protected function orderHierarchicalTaxonomies($source, &$items) {
-    $mappings = $source->importer->config['processor']['config']['mappings'];
-
-    $map_targets = array();
-    foreach ($mappings as $i => $mapping) {
-      $map_targets[$mapping['target']] = $mapping['source'];
-    }
-
-    if (isset($map_targets['parentguid'])) {  //'parentguid' is preferred mapping, so check first
-      $self_source = $map_targets['guid'];
-      $parent_source = $map_targets['parentguid'];
-    }
-    elseif (isset($map_targets['parent'])) { //'parent' is mapping based on parent term name
-      $self_source = $map_targets['name'];
-      $parent_source = $map_targets['parent'];
-    }
-    else {
-      return; // if no parent mapping, do not sort
-    }
-
-    $level = 0;
-    $levels[$level] = array();
-    foreach ($items as $i => $item) {
-      // item is at top level of hierarchy if: (1) no parent or (2) parent source is self
-      if ( ($item[$parent_source] == $item[$self_source]) || !(boolean)$item[$parent_source] ) {
-        $items[$i]['parent'] = 0;
-        $items[$i]['level'] = $level;
-        $level_members[0][] = $item[$self_source];
-      }
-      else {
-        $items[$i]['parent'] = $item[$parent_source];
-      }
-    }
-
-    $this->recurseHierarchyAddingSortIndexes($items, $level_members, $level, $parent_source, $self_source);
-
-    function sortbylevels($item1, $item2) { return $item1['level'] - $item2['level'];}
-
-    usort($items, 'sortbylevels');
-
-    // remove added array fields after sort
-    foreach ($items as $i => $item) {
-      unset($items[$i]['level']);
-      unset($items[$i]['parent']);
-    }
-
-  }
-
-  /**
-   * @param array $items of feed importer items
-   * @param array $level_members as array keyed on level (0, 1, 2...) holding an array of all guids or term names for that level
-   * @param int $level (0, 1, 2, ...) as level in taxonomy hierarchy
-   * @param string $parent_source 'guid' for determining parent by parentguid or 'name' for determining parent by term name
-   *
-   * by reference adds 'level' key to each item in $items array for future sorting.
-   */
-  protected function recurseHierarchyAddingSortIndexes(&$items, &$level_members, $level, $parent_source, $self_source) {
-
-    $found_children = FALSE;
-    foreach ($items as $i => $item) {
-      if (!isset($item['level']) && in_array($item[$parent_source], $level_members[$level])) { // is direct descendant of current level?
-        $items[$i]['level'] = $level + 1;
-        $level_members[$level + 1][] = $item[$self_source];
-        $found_children = TRUE;
-      }
-    }
-    if ($found_children) {
-      $this->recurseHierarchyAddingSortIndexes($items, $level_members, $level + 1, $parent_source, $self_source);
-    }
-    else {
-      foreach ($items as $i => $item) {
-        if (!isset($item['level'])) {
-          $items[$i]['level'] = 0; // make orphans top level so sort works
-        }
-      }
-    }
-  }
-
- /**
-  * Override setTargetElement to operate on a target item that is a term.
-  */
-  public function setTargetElement(FeedsSource $source, $target_node, $target_element, $value) {
-
+  public function setTargetElement(FeedsSource $source, $target_term, $target_element, $value, array $mapping = array()) {
     switch ($target_element) {
       case 'parent':
         if (!empty($value)) {
           $terms = taxonomy_get_term_by_name($value);
           $parent_tid = '';
           foreach ($terms as $term) {
-            if ($term->vid == $target_node->vid) {
+            if ($term->vid == $target_term->vid) {
               $parent_tid = $term->tid;
             }
           }
-
           if (!empty($parent_tid)) {
-            $target_node->parent = $parent_tid;
+            $target_term->parent[] = $parent_tid;
           }
           else {
-            $target_node->parent = 0;
+            $target_term->parent[] = 0;
           }
         }
         else {
-          $target_node->parent = 0;
+          $target_term->parent[] = 0;
         }
         break;
+
       case 'parentguid':
         // value is parent_guid field value
+        $parent_tid = 0;
         $query = db_select('feeds_item')
           ->fields('feeds_item', array('entity_id'))
           ->condition('entity_type', $this->entityType());
-        $parent_tid = $query->condition('guid', $value)->condition('id', $this->id)->execute()->fetchField();
-        $target_node->parent = ($parent_tid) ? $parent_tid : 0;
-
+        $term_ids = array_keys($query->condition('guid', $value)->execute()->fetchAllAssoc('entity_id'));
+        if (!empty($term_ids)) {
+          $terms = entity_load($this->entityType(), $term_ids);
+          foreach ($terms as $term) {
+            if ($term->vid == $target_term->vid) {
+              $parent_tid = $term->tid;
+              break;
+            }
+          }
+        }
+        $target_term->parent[] = $parent_tid;
         break;
+
       case 'weight':
         if (!empty($value)) {
           $weight = intval($value);
@@ -345,10 +154,24 @@ class FeedsTermProcessor extends FeedsProcessor {
         else {
           $weight = 0;
         }
-        $target_node->weight = $weight;
+        $target_term->weight = $weight;
         break;
+
+      case 'description':
+        if (!empty($mapping['format'])) {
+          $target_term->format = $mapping['format'];
+        }
+        elseif (!empty($this->config['input_format'])) {
+          $target_term->format = $this->config['input_format'];
+        }
+        else {
+          $target_term->format = filter_fallback_format();
+        }
+        $target_term->description = $value;
+        break;
+
       default:
-        parent::setTargetElement($source, $target_node, $target_element, $value);
+        parent::setTargetElement($source, $target_term, $target_element, $value);
         break;
     }
   }
@@ -363,35 +186,32 @@ class FeedsTermProcessor extends FeedsProcessor {
         'name' => t('Term name'),
         'description' => t('Name of the taxonomy term.'),
         'optional_unique' => TRUE,
-       ),
+      ),
       'parent' => array(
-        'name' => t('Parent Term Name'),
-        'description' => t('Name of the Parent Term.'),
+        'name' => t('Parent: Term name'),
+        'description' => t('The name of the parent taxonomy term.'),
         'optional_unique' => TRUE,
       ),
       'parentguid' => array(
-        'name' => t('Parent GUID'),
-        'description' => t('The globally unique identifier of the item\'s parent term.'),
+        'name' => t('Parent: GUID'),
+        'description' => t('The GUID of the parent taxonomy term.'),
         'optional_unique' => TRUE,
       ),
       'weight' => array(
-        'name' => t('Term Weight'),
-        'description' => t('Weight of the Term.'),
+        'name' => t('Term weight'),
+        'description' => t('Weight of the taxonomy term.'),
         'optional_unique' => TRUE,
       ),
       'description' => array(
         'name' => t('Term description'),
         'description' => t('Description of the taxonomy term.'),
-       ),
+        'summary_callbacks' => array('text_feeds_summary_callback'),
+        'form_callbacks' => array('text_feeds_form_callback'),
+      ),
     );
-    // Let implementers of hook_feeds_term_processor_targets() add their targets.
-    try {
-      self::loadMappers();
-      feeds_alter('feeds_processor_targets', $targets, 'taxonomy_term', $this->vocabulary()->machine_name);
-    }
-    catch (Exception $e) {
-      // Do nothing.
-    }
+
+    $this->getHookTargets($targets);
+
     return $targets;
   }
 
@@ -419,11 +239,19 @@ class FeedsTermProcessor extends FeedsProcessor {
    * Return vocabulary to map to.
    */
   public function vocabulary() {
-    if (isset($this->config['vocabulary'])) {
-      if ($vocabulary = taxonomy_vocabulary_machine_name_load($this->config['vocabulary'])) {
-        return $vocabulary;
-      }
+    if ($vocabulary = taxonomy_vocabulary_machine_name_load($this->bundle())) {
+      return $vocabulary;
     }
     throw new Exception(t('No vocabulary defined for Taxonomy Term processor.'));
   }
+
+  /**
+   * Overrides FeedsProcessor::dependencies().
+   */
+  public function dependencies() {
+    $dependencies = parent::dependencies();
+    $dependencies['taxonomy'] = 'taxonomy';
+    return $dependencies;
+  }
+
 }

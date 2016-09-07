@@ -73,12 +73,12 @@ class LdapAuthorizationConsumerOG extends LdapAuthorizationConsumerAbstract {
   public static function og2Groups() {
 		$ogs = array();
 		$availableConsumerIDs = array();
-		foreach (og_get_all_group_content_bundle() as $entity_type => $bundles) {
+		foreach (og_get_all_group_bundle() as $entity_type => $bundles) {
 			$group_entity_ids = og_get_all_group($entity_type);
 			$group_entities = entity_load($entity_type, $group_entity_ids);
 			$ogs[$entity_type] = $group_entities;
 			foreach ($group_entities as $entity_id => $group_entity) {
-				$roles = og_roles($entity_type, $group_entity->type, $entity_id);
+				$roles = og_roles($entity_type, isset($group_entity->type) ? $group_entity->type : NULL, $entity_id);
 				$ogs[$entity_type][$entity_id] = array(
 					'roles' => $roles,
 					'entity' => $group_entity,
@@ -300,7 +300,6 @@ class LdapAuthorizationConsumerOG extends LdapAuthorizationConsumerAbstract {
    * @return TRUE if granted or grant exists, FALSE if not grantable or failed.
    */
   public function grantSingleAuthorization(&$user, $authorization_id, &$user_auth_data) {
-
     $result = FALSE;
     $watchdog_tokens =  array('%authorization_id' => $authorization_id, '%username' => $user->name, '%ogversion' => $this->ogVersion);
 		if ($this->detailedWatchdogLog) {

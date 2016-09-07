@@ -19,6 +19,7 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
     $op = $this->inDatabase ? 'edit' : 'insert';
     $values = new stdClass; // $this;
     $values->sid = $this->sid;
+    $values->numeric_consumer_conf_id = $this->numericConsumerConfId;
     $values->consumer_type = $this->consumerType;
     $values->consumer_module = $this->consumer->consumerModule;
     $values->status = ($this->status) ? 1 : 0;
@@ -48,7 +49,6 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
     $values->create_consumers = (int)$this->createConsumers;
     $values->regrant_ldap_provisioned = (int)$this->regrantLdapProvisioned;
 
-
     if (module_exists('ctools')) {
       ctools_include('export');
       // Populate our object with ctool's properties
@@ -58,30 +58,58 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
           $values->$property = $value;
         }
       }
+      $values->export_type = ($this->numericConsumerConfId) ? EXPORT_IN_DATABASE : NULL;
       $result = ctools_export_crud_save('ldap_authorization', $values);
-    }
-    elseif ($op == 'edit') {
-      $result = drupal_write_record('ldap_authorization', $values, 'consumer_type');
-    }
-    else { // insert
-      $result = drupal_write_record('ldap_authorization', $values);
-    }
-
-    if ($result) {
-      $this->inDatabase = TRUE;
+      ctools_export_load_object_reset('ldap_authorization'); // ctools_export_crud_save doesn't invalidate cache
     }
     else {
-      drupal_set_message(t('Failed to write LDAP Authorization to the database.'));
+
+      if ($op == 'edit') {
+        $result = drupal_write_record('ldap_authorization', $values, 'consumer_type');
+      }
+      else { // insert
+        $result = drupal_write_record('ldap_authorization', $values);
+      }
+
+      if ($result) {
+        $this->inDatabase = TRUE;
+      }
+      else {
+        drupal_set_message(t('Failed to write LDAP Authorization to the database.'));
+      }
     }
 
     // revert mappings to array and remove temporary properties from ctools export
-    $this->mappings = $this->pipeListToArray($values->mappings, TRUE);
-    foreach (array('consumer_type', 'consumer_module', 'only_ldap_authenticated',
+    $this->mappings = $this->pipeListToArray($values->mappings, FALSE);
+    foreach (array(
+      'consumer_type',
+      'consumer_module',
+      'only_ldap_authenticated',
+
       'derive_from_dn',
-      'derive_from_dn_attr', 'derive_from_attr', 'derive_from_attr_attr', 'derive_from_attr_use_first_attr', 'derive_from_attr_nested',
-      'derive_from_entry', 'derive_from_entry_entries', 'derive_from_entry_attr', 'derive_from_entry_search_all', 'derive_from_entry_use_first_attr', 'derive_from_entry_nested',
-      'use_filter', 'synch_to_ldap', 'synch_on_logon', 'revoke_ldap_provisioned', 'create_consumers',
-      'regrant_ldap_provisioned') as $prop_name) {
+      'derive_from_dn_attr',
+
+      'derive_from_attr',
+      'derive_from_attr_attr',
+      'derive_from_attr_use_first_attr',
+      'derive_from_attr_nested',
+
+      'derive_from_entry',
+      'derive_from_entry_search_all',
+      'derive_from_entry_entries',
+      'derive_from_entry_entries_attr',
+      'derive_from_entry_attr',
+      'derive_from_entry_user_ldap_attr',
+      'derive_from_entry_use_first_attr',
+      'derive_from_entry_nested',
+
+      'use_filter',
+      'synch_to_ldap',
+      'synch_on_logon',
+      'revoke_ldap_provisioned',
+      'create_consumers',
+      'regrant_ldap_provisioned'
+      ) as $prop_name) {
       unset($this->{$prop_name});
     }
   }
@@ -92,6 +120,9 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
   public function delete() {
     if ($this->consumerType) {
       $this->inDatabase = FALSE;
+      if (module_exists('ctools')) {
+        ctools_export_load_object_reset('ldap_authorization');
+      }
       return db_delete('ldap_authorization')->condition('consumer_type', $this->consumerType)->execute();
     }
     else {
@@ -282,10 +313,10 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
 
     $form['derive_from_entry']['derive_from_entry_preamble'] = array(
         '#type' => 'item',
-        '#markup' => t('Use this strategy if your LDAP has entries for groups and strategy II.B. is not applicable.') .
-          t(' See ') . l('http://drupal.org/node/1499172' , 'http://drupal.org/node/1499172') . t(' for additional documentation.'),
+        '#markup' =>   '<em>' . t('This strategy is still buggy, particularly for openLDAP. See http://drupal.org/node/1412076 and http://drupal.org/node/1066608') .
+         '</em><br/>' .  t('Use this strategy if your LDAP has entries for groups and strategy II.B. is not applicable.') 
+      . t(' See ') . l('http://drupal.org/node/1499172' , 'http://drupal.org/node/1499172') . t(' for additional documentation.'),
     );
-
     $form['derive_from_entry']['derive_from_entry'] = array(
       '#type' => 'checkbox',
       '#title' => t('!consumer_namePlural exist as LDAP entries where a multivalued attribute contains the members', $consumer_tokens),
@@ -295,11 +326,13 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
 
     $form['derive_from_entry']['derive_from_entry_entries'] = array(
       '#type' => 'textarea',
-      '#title' => t('LDAP DNs containing !consumer_shortNamePlural (one per line)', $consumer_tokens),
+      '#title' => t('1. LDAP DNs containing !consumer_shortNamePlural (one per line)', $consumer_tokens),
       '#default_value' => $this->arrayToLines($this->deriveFromEntryEntries),
       '#cols' => 50,
       '#rows' => 6,
-      '#description' => t('Enter a list of LDAP entries where !consumer_namePlural should be searched for.', $consumer_tokens),
+      '#description' => t('Enter a list of LDAP entries where !consumer_namePlural should be searched for.  These will
+        be the Distinguised Names (DNs) of groups such as cn=role1,ou=groups,dc=ad,dc=myuniversity,dc=edu in most cases.
+        In special cases, this may be a list of cns or other attributes.', $consumer_tokens),
       '#states' => array(
         'visible' => array(   // action to take.
           ':input[name="derive_from_entry"]' => array('checked' => TRUE),
@@ -309,11 +342,14 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
 
     $form['derive_from_entry']['derive_from_entry_entries_attr'] = array(
       '#type' => 'textfield',
-      '#title' => t('Attribute holding the previous list of values. e.g. cn, dn', $consumer_tokens),
+      '#title' => t('2. "dn" or attribute holding previous list.', $consumer_tokens),
       '#default_value' => $this->deriveFromEntryEntriesAttr,
       '#size' => 50,
       '#maxlength' => 255,
-      '#description' => t('If the above lists are ldap cns, this should be "cn", if they are ldap dns, this should be "dn"', $consumer_tokens),
+      '#description' => t('In most cases this should be "dn".
+        If your LDAP has an attribute which both (1) holds the DN such as Active Directory\'s
+        distinguishedName AND (2) is present in user and group entries then
+        enter that here to make querying easier.', $consumer_tokens),
       '#states' => array(
         'visible' => array(   // action to take.
           ':input[name="derive_from_entry"]' => array('checked' => TRUE),
@@ -323,12 +359,13 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
 
     $form['derive_from_entry']['derive_from_entry_attr'] = array(
       '#type' => 'textfield',
-      '#title' => t('Attribute holding !consumer_namePlural members', $consumer_tokens),
+      '#title' => t('3. Attribute holding !consumer_namePlural members', $consumer_tokens),
       '#default_value' => $this->deriveFromEntryMembershipAttr,
       '#size' => 50,
       '#maxlength' => 255,
-      '#description' => t('Name of the multivalued attribute which holds the !consumer_namePlural members,
-         for example: uniquemember, memberUid', $consumer_tokens),
+      '#description' => t('Name of the multivalued attribute which holds the !consumer_namePlural members in the
+         entries listed in 1.
+         For example: uniquemember, memberUid.'  , $consumer_tokens),
       '#states' => array(
         'visible' => array(   // action to take.
           ':input[name="derive_from_entry"]' => array('checked' => TRUE),
@@ -338,12 +375,12 @@ class LdapAuthorizationConsumerConfAdmin extends LdapAuthorizationConsumerConf {
 // deriveFromEntryAttrMatchingUserAttr
     $form['derive_from_entry']['derive_from_entry_user_ldap_attr'] = array(
       '#type' => 'textfield',
-      '#title' => t('User LDAP Entry attribute held in "', $consumer_tokens) . $form['derive_from_entry']['derive_from_entry_attr']['#title'] . '"',
+      '#title' => t('4. "dn" or user LDAP Entry attribute held in 3. ("', $consumer_tokens) . $form['derive_from_entry']['derive_from_entry_attr']['#title'] . ')"',
       '#default_value' => $this->deriveFromEntryAttrMatchingUserAttr,
       '#size' => 50,
       '#maxlength' => 255,
       '#description' => t('This is almost always "dn" or "cn".') . '<br/>' .
-      t('For example if the attribute holding members is "uniquemember" and that the group entry has the following uniquemember values: ') .
+      t('For example if the attribute holding members (3.) is "uniquemember" and uniquemember has the following values: ') .
       '<code>
       uniquemember[0]=uid=joeprogrammer,ou=it,dc=ad,dc=myuniversity,dc=edu<br/>
       uniquemember[1]=cn=sysadmins,cn=groups,dc=ad,dc=myuniversity,dc=edu
@@ -648,7 +685,7 @@ Raw authorization ids look like:
 
   protected function populateFromDrupalForm($op, $values) {
     $this->inDatabase = (drupal_strtolower($op) == 'edit' || drupal_strtolower($op) == 'save');
-    $values['mappings'] = $this->pipeListToArray($values['mappings'], TRUE);
+    $values['mappings'] = $this->pipeListToArray($values['mappings'], FALSE);
     $values['derive_from_attr_attr'] = $this->linesToArray($values['derive_from_attr_attr']);
     $values['derive_from_entry_entries'] = $this->linesToArray($values['derive_from_entry_entries']);
 
@@ -828,6 +865,7 @@ Raw authorization ids look like:
       ),
 
       'derive_from_entry_entries_attr' => array(
+        'form_default' => 'dn',
         'schema' => array(
           'type' => 'varchar',
           'length' => 255,

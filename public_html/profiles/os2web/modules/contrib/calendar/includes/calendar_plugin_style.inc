@@ -83,7 +83,13 @@ class calendar_plugin_style extends views_plugin_style {
     $form['max_items'] = array(
       '#title' => t('Maximum items'),
       '#type' => 'select',
-      '#options' => array(0 => t('Unlimited'), 1 => t('1 item'), 3 => t('3 items'), 5 => t('5 items'), 10 => t('10 items')),
+      '#options' => array(
+         0 => t('Unlimited'),
+         1 => format_plural( 1, '1 item', '@count items'),
+         3 => format_plural( 3, '1 item', '@count items'),
+         5 => format_plural( 5, '1 item', '@count items'),
+        10 => format_plural(10, '1 item', '@count items'),
+      ),
       '#default_value' => $this->options['calendar_type'] != 'day' ? $this->options['max_items'] : 0,
       '#description' => t('Maximum number of items to show in calendar cells, used to keep the calendar from expanding to a huge size when there are lots of items in one day.'),
       '#dependency' => array('edit-style-options-calendar-type' => array('month')),
@@ -148,7 +154,7 @@ class calendar_plugin_style extends views_plugin_style {
       '#type' => 'checkboxes',
       '#options' => $field_options,
       '#description' => t('Choose fields to hide when displayed in multi-day rows. Usually you only want to see the title or Colorbox selector in multi-day rows and would hide all other fields.'),
-      '#dependency' => array('edit-style-options-calendar-type' => array('month', 'week')),
+      '#dependency' => array('edit-style-options-calendar-type' => array('month', 'week', 'day')),
       );
   }
 
@@ -169,7 +175,7 @@ class calendar_plugin_style extends views_plugin_style {
 
   }
 
-  function options_submit($form, &$form_state, &$options = array()) {
+  function options_submit(&$form, &$form_state, &$options = array()) {
     $form_state['values']['style_options']['multiday_hidden'] = array_filter($form_state['values']['style_options']['multiday_hidden']);
   }
 
@@ -395,8 +401,9 @@ class calendar_plugin_style extends views_plugin_style {
         // If we're displaying the week number, add it as the
         // first cell in the week.
         if ($i == 0 && !empty($this->date_info->style_with_weekno) && !in_array($this->date_info->granularity, array('day', 'week'))) {
-          $url = $this->view->get_path() . '/' . $this->date_info->year . '-W' . $week;
-          if (!empty($this->date_info->display_types['week'])) {
+          $path = calendar_granularity_path($this->view, 'week');
+          if (!empty($path)) {
+            $url = $path . '/' . $this->date_info->year . '-W' . $week;
             $weekno = l($week, $url, array('query' => !empty($this->date_info->append) ? $this->date_info->append : ''));
           }
           else {
@@ -736,7 +743,7 @@ class calendar_plugin_style extends views_plugin_style {
                   // Add continuation attributes
                   $item->continuation =  ($item->date_start < $this->curday);
                   $item->continues = ( $days > $bucket_cnt );
-                  $item->is_multi_day = $is_multi_day;
+                  $item->is_multi_day = TRUE;
 
                   // Assign the item to the available bucket
                   $multiday_buckets[$wday][$bucket_index] = array(
@@ -840,6 +847,7 @@ class calendar_plugin_style extends views_plugin_style {
             }
             if (empty($this->date_info->mini) && ($max_events == CALENDAR_SHOW_ALL || $count <= $max_events || ($count > 0 && $max_events == CALENDAR_HIDE_ALL))) {
               if ($item->calendar_all_day) {
+                $item->is_multi_day = TRUE;
                 $all_day[] = $item;
               }
               else {
@@ -917,6 +925,23 @@ class calendar_plugin_style extends views_plugin_style {
     $day_wday = date_format($this->curday, 'w');
     date_modify($this->curday, '-' . strval((7 + $day_wday - $first_day) % 7) . ' days');
     $curday_date = date_format($this->curday, DATE_FORMAT_DATE);
+
+    if (!empty($this->date_info->style_with_weekno)) {
+      $path = calendar_granularity_path($this->view, 'week');
+      if (!empty($path)) {
+        $url = $path . '/' . $this->date_info->year . '-W' . $week;
+        $weekno = l($week, $url, array('query' => !empty($this->date_info->append) ? $this->date_info->append : ''));
+      }
+      else {
+        // Do not link week numbers, if Week views are disabled.
+        $weekno = $week;
+      }
+      $rows[$week][] = array(
+        'data' => $weekno,
+        'class' => 'mini week',
+        'id' => $this->view->name . '-weekno-' . $curday_date,
+      );
+    }
 
     for ($i = 0; $i < 7; $i++) {
       $curday_date = date_format($this->curday, DATE_FORMAT_DATE);

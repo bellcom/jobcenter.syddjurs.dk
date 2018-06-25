@@ -6,6 +6,28 @@ Version 7.x-3.x-dev
 ===================
 
 ======================
+Version 7.x-3.5
+======================
+
+- Issue #1729884 by lund.mikkel: Translations of max items collide with other translations.
+- Issue #1734858 by Jaws, pc-wurm: Create localized_options array in calendar_menu_local_tasks_alter() if it does not exist.
+- Issue #2008554 by coredumperror: Properly display week numbers in mini calendar view.
+- Issue #1471400 by RoSk0, Garrett Albright: Fix illegal offset in template_preprocess_calendar_month().
+- Issue #1792368 by rdela, Day template missing % after $first_column_width
+
+======================
+Version 7.x-3.4
+======================
+
+- Remove calendar_row_node completely.
+- Remove Calendar iCal completely.
+- Issue #1552212, Week numbers in the month view lost their links.
+- Change default tracking behavior to be off. 
+- Issue #1556180 by hass, Error: Strict warning: Declaration of calendar_plugin_style::options_submit().
+- Issue #1588590, Cannot always unset date link once set.
+- Issue #1565994, Remove default caching from calendar. Let people set it up themselves.
+
+======================
 Version 7.x-3.3
 ======================
 

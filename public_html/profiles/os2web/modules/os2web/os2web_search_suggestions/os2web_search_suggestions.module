@@ -266,8 +266,8 @@ function os2web_search_suggestions_block_view($delta = '') {
 
       // Create your block content here
       $block['subject'] = t('Search suggestions');
-      $url = request_uri();
-      $search_key = end(explode("/", request_uri()));
+      $url = $_GET['q'];
+      $search_key =  end(explode("/", $url));
       $tokens = array('!search_text');
       $replace = array($search_key);
       $query = new EntityFieldQuery();
@@ -278,7 +278,7 @@ function os2web_search_suggestions_block_view($delta = '') {
         $content .= "<ul>";
         foreach ($result['search_suggestion'] as $search) {
           $entity = reset(entity_load('search_suggestion', array($search->id)));
-          $content .= '<li>' . str_replace( $tokens, $replace, $entity->text_before_link) . ' <a href = "' . $entity->search_url . $search_key . '" target="_blank">' . str_replace($tokens, $replace, $entity->link_text) . '</a> ' . str_replace($tokens, $replace, $entity->text_after_link) . '</li>';
+          $content .= '<li>' . str_replace( $tokens, $replace, $entity->text_before_link) . ' <a href = "' . $entity->search_url . $search_key . '" target="_blank">' . rawurldecode(str_replace($tokens, $replace, $entity->link_text)) . '</a> ' . str_replace($tokens, $replace, $entity->text_after_link) . '</li>';
         }
         $content .= "</ul>";
         $content .= str_replace( $tokens, $replace, variable_get('os2web_search_suggestions_text_after_links', ''));

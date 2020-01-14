@@ -20,6 +20,7 @@ function os2web_kontaktblok_context_default_contexts() {
     'node' => array(
       'values' => array(
         'contentpage' => 'contentpage',
+        'news' => 'news',
       ),
       'options' => array(
         'node_form' => '1',

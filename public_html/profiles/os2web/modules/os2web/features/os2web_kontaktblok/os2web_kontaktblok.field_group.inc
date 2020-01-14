@@ -8,7 +8,7 @@
  * Implements hook_field_group_info().
  */
 function os2web_kontaktblok_field_group_info() {
-  $export = array();
+  $field_groups = array();
 
   $field_group = new stdClass();
   $field_group->disabled = FALSE; /* Edit this to true to make a default field_group disabled initially */
@@ -19,8 +19,14 @@ function os2web_kontaktblok_field_group_info() {
   $field_group->bundle = 'kontaktblok';
   $field_group->mode = 'form';
   $field_group->parent_name = '';
-  $field_group->data = '';
-  $export['group_aabningstider|node|kontaktblok|form'] = $field_group;
+  $field_group->data = array(
+    'format_settings' => array(
+      'instance_settings' => array(
+        'classes' => 'group-aabningstider field-group-',
+      ),
+    ),
+  );
+  $field_groups['group_aabningstider|node|kontaktblok|form'] = $field_group;
 
-  return $export;
+  return $field_groups;
 }

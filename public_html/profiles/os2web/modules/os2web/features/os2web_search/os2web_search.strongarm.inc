@@ -80,7 +80,6 @@ function os2web_search_strongarm() {
   $strongarm->value = array(
     'apachesolr_search' => 'apachesolr_search',
     'node' => 0,
-    'ds_search' => 0,
     'user' => 0,
   );
   $export['search_active_modules'] = $strongarm;

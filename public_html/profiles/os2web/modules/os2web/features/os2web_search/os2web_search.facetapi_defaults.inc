@@ -1499,7 +1499,7 @@ function os2web_search_facetapi_default_facet_settings() {
     'nofollow' => 1,
     'show_expanded' => 0,
     'empty_text' => array(
-      'value' => '<div class="item-list"><ul class="facetapi-facetapi-links facetapi-facet-im-field-site-structure facetapi-processed" id="facetapi-facet-apachesolrsolr-block-im-field-site-structure"><li class="leaf first"><a href="#">Ingen filtre</a></li></ul></div>',
+      'value' => '<div class="item-list"><ul class="facetapi-facetapi-links facetapi-facet-im-field-site-structure facetapi-processed" id="facetapi-facet-apachesolrsolr-block-im-field-site-structure"><li class="leaf first"><a href="#">Ingen filtre</a></li></ul></div><p>&nbsp;</p>',
       'format' => 'php_code',
     ),
     'submit_realm' => 'Save and go back to realm settings',

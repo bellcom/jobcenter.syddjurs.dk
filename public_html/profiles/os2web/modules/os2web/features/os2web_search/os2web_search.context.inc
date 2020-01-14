@@ -44,10 +44,13 @@ function os2web_search_context_default_contexts() {
           'region' => 'sidebar_first',
           'weight' => '-9',
         ),
+        'views-kontaktblok-block_1' => array(
+          'module' => 'views',
+          'delta' => 'kontaktblok-block_1',
+          'region' => 'sidebar_second',
+          'weight' => '-10',
+        ),
       ),
-    ),
-    'delta' => array(
-      'delta_template' => 'hide_second_sidebar',
     ),
   );
   $context->condition_mode = 0;

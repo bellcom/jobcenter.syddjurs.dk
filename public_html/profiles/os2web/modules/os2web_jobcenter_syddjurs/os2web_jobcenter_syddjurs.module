@@ -108,3 +108,12 @@ function os2web_jobcenter_syddjurs_process_block(&$vars) {
     $vars['block']->subject = l($vars['block']->subject, current_path());
   }
 }
+
+/**
+ * Implements hook_init().
+ */
+function os2web_jobcenter_syddjurs_init(&$vars) {
+  if (arg(0) == 'was') {
+    drupal_goto('https://www.was.digst.dk/jobcentersyddjurs-dk');
+  }
+}

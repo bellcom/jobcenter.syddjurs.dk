@@ -2090,8 +2090,11 @@ p.MsoNormal {
 	margin-left: 10px;
 }
 */
-#region-footer-first {background-repeat: no-repeat; height: 53px; line-height: 53px; background-color: #FBFBFB; color: #B3B3B3; font-size: 11px; overflow: hidden}
-
+#region-footer-first {background-repeat: no-repeat; height: 100px; line-height: 53px; background-color: #FBFBFB; color: #B3B3B3; font-size: 11px; overflow: hidden}
+#region-footer-first a.accessibility-link {
+    text-decoration: none;
+    color: rgb(179, 179, 179);
+}
 .region-footer-first-inner {
     line-height: 53px;
     padding-left: 200px
